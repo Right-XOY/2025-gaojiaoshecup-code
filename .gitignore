@@ -1,0 +1,24 @@
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.iml
+
+# ===== MATLAB =====
+*.asv
+*.m~
+*.mat
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 原版论文参考（不公开）=====
+docs/q5_initial.md
+docs/q5_second.md
