@@ -16,7 +16,6 @@
 ├── code/                MATLAB 求解代码
 │   ├── q1_main.m            问题 1 主程序
 │   ├── q2_main.m            问题 2 主程序（文化基因算法）
-│   ├── q2b_milp.m           问题 2 方案 B（MILP）
 │   ├── q3_main.m            问题 3 主程序（JADE）
 │   ├── q4_main.m            问题 4 主程序（分层优化）
 │   ├── q5_main.m            问题 5 主程序（分层 + ILP 指派）
@@ -43,7 +42,6 @@
 - **MATLAB R2021a 或更高版本**
 - 工具箱依赖：
   - `q2_main.m` 使用遗传算法 `ga` + 模式搜索 `patternsearch`（需 **Global Optimization Toolbox**）
-  - `q2b_milp.m` 使用 `intlinprog`（需 **Optimization Toolbox**）
   - `q1_main.m`、`q3_main.m`、`q4_main.m`、`q5_main.m` 使用自写算法 `q3_jade.m`，**无需额外工具箱**
 
 ---
