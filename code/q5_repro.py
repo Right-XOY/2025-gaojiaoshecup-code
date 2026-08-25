@@ -101,22 +101,22 @@ def relay_best(uav0, M0, base, dt=0.02):
     th0, v0, tl0, tau0 = base
     T_end = np.linalg.norm(M0) / VM
     tau_max = np.sqrt(2 * uav0[2] / G)
-    tau_cand = sorted({x for x in [0.5, 1.0, 2.0, tau0 - 2, tau0 - 1, tau0,
-                                   tau0 + 1, tau0 + 2] if 0 < x <= tau_max})
+    tau_cand = sorted({x for x in
+                       [0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0]
+                       if 0 < x <= tau_max})
+    th = th0                       # 接力方向 = 单弹最优方向（已数值验证）
     best = (0.0, None)
-    for dth in [-10, 0, 10]:
-        th = th0 + dth
-        for v in range(max(70, int(v0) - 10), min(145, int(v0) + 15), 5):
-            for gap in [1.0, 2.0]:
-                for tau in tau_cand:
-                    for t0 in [max(0.0, tl0 - 2), tl0, tl0 + 2]:
-                        t_ls = [t0, t0 + gap, t0 + 2 * gap]
-                        taus = [tau, tau, tau]
-                        if t_ls[-1] + tau > T_end:
-                            continue
-                        d, s, e = multi_shield(uav0, M0, th, v, t_ls, taus, dt)
-                        if d > best[0]:
-                            best = (d, (th, v, t_ls, taus, s, e))
+    for v in range(70, 145, 5):
+        for gap in [1.0, 2.0]:
+            for tau in tau_cand:
+                for t0 in [max(0.0, tl0 - 3), tl0, tl0 + 3]:
+                    t_ls = [t0, t0 + gap, t0 + 2 * gap]
+                    taus = [tau, tau, tau]
+                    if t_ls[-1] + tau > T_end:
+                        continue
+                    d, s, e = multi_shield(uav0, M0, th, v, t_ls, taus, dt)
+                    if d > best[0]:
+                        best = (d, (th, v, t_ls, taus, s, e))
     return best
 
 

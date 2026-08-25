@@ -66,16 +66,22 @@ m_names   = {'M1', 'M2', 'M3'};
 data_dir = fullfile(fileparts(mfilename('fullpath')), '..', 'data');
 pot = readmatrix(fullfile(data_dir, 'q5_prescan_pot.csv'));
 
-%% ================== 3. 第1层：候选任务指派（ILP 自动求解） ==================
-k = 3;
-cand = q5_assign(pot, k);
-
-%% ================== 4. 第2层+第3层：逐候选求解 ==================
 % 精确预扫描最优单弹参数（uav, m, theta, v, t_l, tau, bestT, win_s, win_e），
-% 由 q5_prescan.py 生成（data/q5_prescan_par.csv），作为第2层 JADE 种子。
+% 由 q5_prescan.py 生成（data/q5_prescan_par.csv），作为接力预扫描/第2层种子。
 scan_par = readmatrix(fullfile(data_dir, 'q5_prescan_par.csv'));
 
 params.dt = 0.05;                      % 粗时间步长 (s)
+
+%% ================== 3. 接力预扫描 + 第1层：候选任务指派 ==================
+% 对每个可行组合求「单机 3 弹接力」最优时长，作为 ILP 系数，修正旧假设
+% 「同机多弹无法接力」——单机接力可显著延长遮蔽（FY2→M2 3.9→7.5s），
+% 避免多余机（如 FY4）被错误指派到已被单机接力覆盖的导弹上造成浪费。
+[pot_relay, par_relay] = q5_relay_prescan(params, pot, scan_par);
+
+k = 3;
+cand = q5_assign(pot_relay, k);
+
+%% ================== 4. 第2层+第3层：逐候选求解 ==================
 opts_s.NP = 30;  opts_s.MAXITER = 200; opts_s.p = 0.05; opts_s.c = 0.1;
 opts_j.NP = 40;  opts_j.MAXITER = 250; opts_j.p = 0.05; opts_j.c = 0.1;
 
@@ -105,7 +111,7 @@ for t = 1:k
 
     % ---- 第2层：三枚导弹独立子问题 JADE ----
     % 每机 θ/v 纳入决策变量（同机多弹共享），与各弹位 t_l/τ 联合搜索，
-    % 使 JADE 能在"单弹最优方向（朝+x）"与"接力方向（朝-x）"间权衡，
+    % 使 JADE 在单弹最优方向（迎向导弹，即接力方向）上优化速度/延时，
     % 实现同机多弹真正接力（满足 θ/v 一旦确定不再调整的题目约束）。
     x_lower  = cell(1, 3);
     f_lower  = zeros(1, 3);
@@ -130,8 +136,8 @@ for t = 1:k
             ub = [ub, params.T_end(m), tau_max];
         end
 
-        % 种子：预扫描单弹 θ/v + θ=180° 接力方向 + 投放/延时错开变体
-        seeds = q5_build_seeds(m, servers{m}, scan_par, params);
+        % 种子：预扫描单弹 θ/v + 接力速度档 + 接力预扫描最优解（par_relay）
+        seeds = q5_build_seeds(m, servers{m}, scan_par, params, par_relay);
         opts_s.X0 = seeds;
         fun_m = @(x) q5_missile_fitness(x, params, m, servers{m});
         D = 2*nU + 2*nS;
@@ -442,11 +448,13 @@ view(3);  hold off;
 disp('求解完成。请检查控制台输出与 result3.xlsx，以及三张图。');
 
 %% ================== 局部函数：第2层种子生成 ==================
-function seeds = q5_build_seeds(m_idx, servers, scan_par, params)
+function seeds = q5_build_seeds(m_idx, servers, scan_par, params, par_relay)
 % 为单导弹子问题（第2层）构造初始种群。
 % 决策变量 = [θ/v (2*nU), t_l/τ (2*nS)]，前 2*nU 维为各服务机 [θ,v]。
-% 种子设计：前 5 组用预扫描单弹 θ/v，后 5 组用 θ=180° 接力方向（朝 -x
-% 迎向导弹），使 JADE 能兼顾"单弹最优"与"同机多弹接力"两类盆域。
+% 种子设计：
+%   1) 前 10 组：预扫描单弹 θ/v + 接力速度档，t_l 沿弹位错开 1 s；
+%   2) 追加接力预扫描最优解（par_relay），使 JADE 从接力盆地出发，
+%      修正「单弹最优 v/τ 不产生接力增益、JADE 因而漂移」的问题。
 nU = numel(servers.uavs);
 nS = size(servers.slots, 1);
 D  = 2*nU + 2*nS;
@@ -457,7 +465,7 @@ for u = 1:nU
     uav_idx = servers.uavs(u);
     r = find(scan_par(:, 1) == uav_idx & scan_par(:, 2) == m_idx, 1);
     if isempty(r)
-        base(u, :) = [180, 110, 5, 4];      % 兜底：朝 -x 接力方向
+        base(u, :) = [180, 110, 5, 4];      % 兜底
     else
         base(u, :) = scan_par(r, 3:6);      % [θ, v, t_l, τ]
     end
@@ -469,9 +477,7 @@ for u = 1:nU
     uav_pos(servers.uavs(u)) = u;
 end
 
-% 接力速度档（后 5 组用，探索不同速度下的同机多弹接力，均在 [70,140] 内）
-% 数值验证结论：同机多弹接力方向 = 单弹最优方向（朝 +x 类，而非朝 -x），
-% 多弹沿该方向分布可向前延伸遮蔽弧段；相邻投放间隔 1 s 时接力最优。
+% 接力速度档（数值验证：接力方向 = 单弹最优方向，多弹沿该方向 1 s 错开）
 v_relay = [85, 90, 95, 100, 105];
 
 seeds = zeros(10, D);
@@ -498,5 +504,38 @@ for g = 1:10
         seeds(g, 2*nU + 2*s-1) = tl;
         seeds(g, 2*nU + 2*s)   = tau;
     end
+end
+
+% ---- 追加接力预扫描最优解作为种子 ----
+if nargin >= 5 && ~isempty(par_relay)
+    extra = zeros(0, D);
+    for u = 1:nU
+        uav_idx = servers.uavs(u);
+        xr = par_relay{uav_idx, m_idx};
+        if isempty(xr), continue; end
+        row = zeros(1, D);
+        % θ/v：本机用接力最优，其余机用单弹最优
+        for uu = 1:nU
+            row(2*uu-1) = base(uu, 1);
+            row(2*uu)   = base(uu, 2);
+        end
+        row(2*u-1) = xr(1);
+        row(2*u)   = xr(2);
+        % t_l/τ：本机 3 弹用接力最优，其余机单弹最优错开 1 s
+        for s = 1:nS
+            si = servers.slots(s, 1);
+            q  = servers.slots(s, 2);
+            uu = uav_pos(si);
+            if si == uav_idx
+                row(2*nU + 2*s-1) = xr(2*q + 1);   % t_l
+                row(2*nU + 2*s)   = xr(2*q + 2);   % τ
+            else
+                row(2*nU + 2*s-1) = base(uu, 3) + (q-1)*1;
+                row(2*nU + 2*s)   = base(uu, 4);
+            end
+        end
+        extra(end+1, :) = row; %#ok<AGROW>
+    end
+    seeds = [seeds; extra];
 end
 end
