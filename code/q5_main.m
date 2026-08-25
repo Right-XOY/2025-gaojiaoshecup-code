@@ -359,8 +359,8 @@ for m = 1:3
         mask = (ts_m >= t_d(r)) & (ts_m <= t_d(r) + 20);
         if any(mask)
             Cw = P_d(:, r)*ones(1, sum(mask)) - [0; 0; 3]*(ts_m(mask) - t_d(r));
-            occ = q3_occlusion_window(params.M0_all(:, m)*ones(1, numel(ts_m)) + ...
-                params.v_m*(params.u_m_all(:, m)*ts_m), Cw, params.R, params);
+            occ = q3_occlusion_window(params.M0_all(:, m)*ones(1, sum(mask)) + ...
+                params.v_m*(params.u_m_all(:, m)*ts_m(mask)), Cw, params.R, params);
             sh_m(mask) = sh_m(mask) | occ(:)';
         end
     end
