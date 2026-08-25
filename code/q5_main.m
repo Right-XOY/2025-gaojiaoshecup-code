@@ -469,29 +469,31 @@ for u = 1:nU
     uav_pos(servers.uavs(u)) = u;
 end
 
-% 接力方向速度档（后 5 组用，均在 [70,140] 内）
-v_relay = [105, 110, 115, 120, 125];
+% 接力速度档（后 5 组用，探索不同速度下的同机多弹接力，均在 [70,140] 内）
+% 数值验证结论：同机多弹接力方向 = 单弹最优方向（朝 +x 类，而非朝 -x），
+% 多弹沿该方向分布可向前延伸遮蔽弧段；相邻投放间隔 1 s 时接力最优。
+v_relay = [85, 90, 95, 100, 105];
 
 seeds = zeros(10, D);
 for g = 1:10
     % ---- θ/v 部分 ----
     for u = 1:nU
+        th = base(u, 1);                     % 单弹最优 θ 即接力方向
         if g <= 5
-            th = base(u, 1);  v = base(u, 2);   % 预扫描单弹 θ/v
+            v = base(u, 2);                  % 预扫描单弹最优 v
         else
-            th = 180;                          % 接力方向（朝 -x）
-            v  = v_relay(g-5);
+            v = v_relay(g-5);                % 不同速度档探索接力
         end
         seeds(g, 2*u-1) = th;
         seeds(g, 2*u)   = v;
     end
-    % ---- t_l/τ 部分：同机多弹沿航向错开，保证连投间隔 >= 1 s ----
+    % ---- t_l/τ 部分：同机多弹沿航向错开 1 s（相邻投放间隔 >= 1 s）----
     for s = 1:nS
         uav_idx = servers.slots(s, 1);
         u  = uav_pos(uav_idx);
-        q  = servers.slots(s, 2);              % 弹位编号 1~3
-        tl  = base(u, 3) + (q-1)*3 + 0.2*(g-1);
-        tau = base(u, 4) + 0.2*mod(g-1, 5);
+        q  = servers.slots(s, 2);            % 弹位编号 1~3
+        tl  = base(u, 3) + (q-1)*1 + 0.1*(g-1);
+        tau = base(u, 4) + 0.1*mod(g-1, 5);
         if tl < 0, tl = 0; end
         seeds(g, 2*nU + 2*s-1) = tl;
         seeds(g, 2*nU + 2*s)   = tau;
