@@ -47,5 +47,5 @@ set(gca, 'Box','on');
 legend({'计算遮蔽时长','收敛极限 \it T\rm_\infty = 1.391643 s'},...
     'Location','southwest','Box','off','FontSize',9);
 
-print(gcf,'sensitivity_n_convergence','-dpng','-r300');
+print(gcf,'q1_sensitivity','-dpng','-r300');
 fprintf('输出完成，对数X轴，前几个点自动拉开间距\n');

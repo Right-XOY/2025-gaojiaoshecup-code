@@ -99,7 +99,7 @@ box off;
 xticks([]); yticks([]); zticks([]);
 
 %% 输出，传入fig句柄修复print报错
-print(fig,'proj_3d_occlusion','-depsc');
-savefig(fig,'proj_3d_occlusion.fig');
+print(fig,'occlusion_schematic','-depsc');
+savefig(fig,'occlusion_schematic.fig');
 
 hold(ax,'off');

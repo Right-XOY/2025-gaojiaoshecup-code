@@ -230,10 +230,10 @@ view(ax_inset, 3);
 
 %% ==================== 导出图片 ====================
 try
-    exportgraphics(fig, 'q2_3d_original_look_bigmarker.png', ...
+    exportgraphics(fig, 'q2_3d_inset.png', ...
         'Resolution', 300);
 catch
-    print(fig, 'q2_3d_original_look_bigmarker', '-dpng', '-r300');
+    print(fig, 'q2_3d_inset', '-dpng', '-r300');
 end
 
-fprintf('绘图完成：q2_3d_original_look_bigmarker.png\n');
+fprintf('绘图完成：q2_3d_inset.png\n');
