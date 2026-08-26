@@ -7,8 +7,9 @@
 %    第0层【精确预扫描】code/q5_prescan.py 对 5 机 x 3 导弹的每个组合
 %      做网格扫描，生成遮蔽潜力矩阵 pot 与最优单弹参数表（不硬编码）。
 %    第1层【任务指派】基于 pot 矩阵自动求解整数线性规划
-%      （ILP 框架，c_ij 取精确预扫描 pot），把 5 机的
-%      弹位指派给 M1/M2/M3，取最优 + 次优共 k 套候选，全部向下传递；
+%      （ILP 框架，c_ij 取接力预扫描 pot_relay），把 5 机的
+%      弹位指派给 M1/M2/M3，取前 k 套候选（按 ILP 目标）向下传递，
+%      由第2/3层用真实并集时长精筛（ILP 相加 ≠ 并集，故扩大候选池）；
 %    第2层【子问题优化】对每套候选，M1/M2/M3 各自独立求解一个
 %      多弹接力子问题（最大化该导弹独立遮蔽并集时长，为第3层提供
 %      遮蔽窗口种子）；
@@ -78,8 +79,8 @@ params.dt = 0.05;                      % 粗时间步长 (s)
 % 避免多余机（如 FY4）被错误指派到已被单机接力覆盖的导弹上造成浪费。
 [pot_relay, par_relay] = q5_relay_prescan(params, pot, scan_par);
 
-k = 3;
-cand = q5_assign(pot_relay, k);
+k = 12;                         % 候选上限：扩大候选池，由第2/3层用真实并集精筛
+[cand, nCand] = q5_assign(pot_relay, k);
 
 %% ================== 4. 第2层+第3层：逐候选求解 ==================
 opts_s.NP = 30;  opts_s.MAXITER = 200; opts_s.p = 0.05; opts_s.c = 0.1;
@@ -89,8 +90,8 @@ opts_j.NP = 40;  opts_j.MAXITER = 250; opts_j.p = 0.05; opts_j.c = 0.1;
 best_info = struct('total', -inf, 'x_lower', [], 'hist_lower', [], ...
                    'x_joint', [], 'f_joint', [], 'ginfo', [], 'theta_v_all', []);
 
-for t = 1:k
-    fprintf('\n================ 候选指派 %d/%d ================\n', t, k);
+for t = 1:nCand
+    fprintf('\n================ 候选指派 %d/%d ================\n', t, nCand);
 
     % ---- 展开候选：各导弹服务表 -> servers 结构 + 全局弹位表 ----
     servers = cell(1, 3);               % servers{m}
