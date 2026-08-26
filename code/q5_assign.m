@@ -1,4 +1,4 @@
-function [cand, nGet] = q5_assign(pot, k)
+function [cand, nGet] = q5_assign(pot, delta, k)
 % q5_assign  问题5【第1层】任务分配——精确 pot + ILP 自动求解（不硬编码）
 %
 % 分配模型（ILP 框架，其中 c_ij 采用精确物理预扫描得到的 pot 矩阵，
@@ -19,9 +19,11 @@ function [cand, nGet] = q5_assign(pot, k)
 %      = 1024 组合），不依赖整数规划工具箱，也不硬编码任何分配。
 %
 % 输入：
-%   pot - 5 x 3 遮蔽潜力矩阵（行=无人机 FY1~FY5，列=导弹 M1~M3），
-%         单机 3 弹接力最优时长，由 q5_relay_prescan.m 生成（pot_relay）
-%   k   - 候选上限（默认 3；有效候选不足时返回实际数目）
+%   pot   - 5 x 3 遮蔽潜力矩阵（行=无人机 FY1~FY5，列=导弹 M1~M3），
+%           单机 3 弹接力最优时长，由 q5_relay_prescan.m 生成（pot_relay）
+%   delta - 5 x 5 x 3 两机协同重叠损失（<=0），由 q5_pair_prescan.m 生成，
+%           用于修正"相加"目标：两机同服务同导弹时减去窗口重叠
+%   k     - 候选上限（默认 3；有效候选不足时返回实际数目）
 % 输出：
 %   cand - 1 x nGet 结构体数组；cand(t).missile{m} = n x 2 服务表
 %          （第1列无人机编号，第2列该机为此导弹分配的弹位上限）
@@ -29,7 +31,8 @@ function [cand, nGet] = q5_assign(pot, k)
 %
 % 依赖：无（纯指派层）
 
-if nargin < 2, k = 3; end
+if nargin < 3, k = 3; end
+if nargin < 2, delta = zeros(size(pot, 1), size(pot, 1), size(pot, 2)); end
 nU = size(pot, 1);  nM = size(pot, 2);
 base = nM + 1;                        % 每机选择：0=不出动, 1..nM=服务导弹
 
@@ -52,6 +55,18 @@ for c = 1:nC
         end
         covered(m) = true;
         sc = sc + pot(j, m);
+    end
+    % pair 重叠修正：两机同服务同一导弹时，减去窗口重叠损失（delta<=0），
+    % 使目标逼近真实并集（否则"相加"会高估多机协同）。
+    if ok
+        for m = 1:nM
+            js = find(a == m);
+            for ii = 1:numel(js)
+                for jj = ii+1:numel(js)
+                    sc = sc + delta(js(ii), js(jj), m);
+                end
+            end
+        end
     end
     if ok && all(covered)             % 每枚导弹至少被 1 机干扰
         valid(c) = true;
@@ -82,7 +97,7 @@ end
 %% ---- 控制台输出候选方案 ----
 uav_names = {'FY1','FY2','FY3','FY4','FY5'};
 for t = 1:nGet
-    fprintf('--- 候选指派 %d（ILP 目标 Σpot=%.2f）---\n', t, scores(ord(t)));
+    fprintf('--- 候选指派 %d（ILP 目标=%.2f，含 pair 重叠修正）---\n', t, scores(ord(t)));
     for m = 1:nM
         srv = cand(t).missile{m};
         if isempty(srv)
