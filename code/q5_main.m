@@ -78,9 +78,10 @@ params.dt = 0.05;                      % 粗时间步长 (s)
 % 「同机多弹无法接力」——单机接力可显著延长遮蔽（FY2→M2 3.9→7.5s），
 % 避免多余机（如 FY4）被错误指派到已被单机接力覆盖的导弹上造成浪费。
 [pot_relay, par_relay] = q5_relay_prescan(params, pot, scan_par);
+[U_pair, delta_pair] = q5_pair_prescan(params, pot_relay, par_relay);
 
 k = 12;                         % 候选上限：扩大候选池，由第2/3层用真实并集精筛
-[cand, nCand] = q5_assign(pot_relay, k);
+[cand, nCand] = q5_assign(pot_relay, delta_pair, k);
 
 %% ================== 4. 第2层+第3层：逐候选求解 ==================
 opts_s.NP = 30;  opts_s.MAXITER = 200; opts_s.p = 0.05; opts_s.c = 0.1;
